@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+<meta charset="UTF-8">
+<title>Балалар пазлы</title>
+
+<style>
+body {
+    font-family: Arial;
+    background: #fff0f5;
+    text-align: center;
+    color: #880e4f;
+}
+
+/* ===== Layout ===== */
+.game-layout {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    flex-wrap: wrap;
+}
+
+/* ===== Board ===== */
+#puzzle-board {
+    width: 480px;
+    height: 480px;
+    display: grid;
+    grid-template-columns: repeat(3,1fr);
+    grid-template-rows: repeat(3,1fr);
+    background: white;
+    border-radius: 20px;
+}
+
+.drop-zone {
+    width: 160px;
+    height: 160px;
+}
+
+/* ===== Pieces ===== */
+#pieces-container {
+    width: 520px;
+    min-height: 480px;
+    border: 2px dashed #ec407a;
+    border-radius: 20px;
+    padding: 15px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    justify-content: center;
+}
+
+.puzzle-piece {
+    width: 160px;
+    height: 160px;
+    background-image: url("image.jpeg");
+    background-size: 480px 480px;
+    cursor: grab;
+}
+
+/* ===== Shapes (оң жақта ғана) ===== */
+.shape-square {
+    clip-path: inset(0);
+}
+
+.shape-circle {
+    clip-path: circle(50%);
+}
+
+.shape-triangle {
+    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+
+/* ✅ ЖАҢА: ПРЯМОУГОЛЬНИК */
+.shape-rectangle {
+    clip-path: inset(0 25% 0 25%);
+}
+
+/* ===== Board-қа қойған кезде ===== */
+.placed {
+    clip-path: inset(0);
+}
+
+/* ===== Feedback ===== */
+#feedback {
+    font-size: 26px;
+    height: 30px;
+    margin: 10px;
+}
+
+/* ===== Buttons ===== */
+button {
+    padding: 12px 28px;
+    border-radius: 30px;
+    border: none;
+    background: #d81b60;
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    margin: 8px;
+}
+
+/* ===== Final Congrats ===== */
+#finalCongrats {
+    position: fixed;
+    top: -300px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ffe4ec;
+    padding: 35px 60px;
+    border-radius: 25px;
+    font-size: 32px;
+    z-index: 999;
+    transition: top 0.8s ease;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+#finalCongrats.show {
+    top: 30px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Үйшікті құрастыр 🧩</h1>
+
+<button id="musicBtn" onclick="toggleMusic()">🔊 Музыка</button>
+
+<div id="feedback"></div>
+
+<div class="game-layout">
+    <div id="puzzle-board"></div>
+    <div id="pieces-container"></div>
+</div>
+
+<div id="finalCongrats">
+    🌟 Жарайсың, балақай!<br>Сен үздіксің! 🌟
+    <br><br>
+    <button onclick="restartGame()">Қайта ойнау</button>
+</div>
+
+<audio id="bgMusic" loop>
+    <source src="music.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+const rows = 3;
+const cols = 3;
+const size = 160;
+
+const board = document.getElementById("puzzle-board");
+const container = document.getElementById("pieces-container");
+const feedback = document.getElementById("feedback");
+const finalCongrats = document.getElementById("finalCongrats");
+
+const music = document.getElementById("bgMusic");
+const musicBtn = document.getElementById("musicBtn");
+
+const praise = ["Жарайсың!", "Керемет!", "Тамаша!"];
+let praiseIndex = 0;
+
+let dragged = null;
+let pieces = [];
+
+/* ===== MUSIC ===== */
+function toggleMusic(){
+    if(music.paused){
+        music.play();
+        musicBtn.textContent="🔇 Музыканы өшіру";
+    }else{
+        music.pause();
+        musicBtn.textContent="🔊 Музыка";
+    }
+}
+
+/* ===== BOARD ===== */
+function createBoard(){
+    board.innerHTML="";
+    for(let i=0;i<9;i++){
+        const zone=document.createElement("div");
+        zone.className="drop-zone";
+        zone.dataset.index=i;
+
+        zone.ondragover=e=>e.preventDefault();
+        zone.ondrop=()=>handleDrop(zone);
+
+        board.appendChild(zone);
+    }
+}
+
+/* ===== PIECES ===== */
+function createPieces(){
+    container.innerHTML="";
+    pieces=[];
+
+    /* ❗ Ромб жоқ, орнына прямоугольник */
+    const shapes=[
+        "shape-square",
+        "shape-circle",
+        "shape-triangle",
+        "shape-rectangle"
+    ];
+
+    for(let r=0;r<rows;r++){
+        for(let c=0;c<cols;c++){
+            const i=r*cols+c;
+
+            const piece=document.createElement("div");
+            piece.className="puzzle-piece "+shapes[i % shapes.length];
+            piece.draggable=true;
+            piece.dataset.index=i;
+
+            piece.style.backgroundPosition=
+                `-${c*size}px -${r*size}px`;
+
+            piece.ondragstart=()=>dragged=piece;
+
+            pieces.push(piece);
+        }
+    }
+
+    pieces.sort(()=>Math.random()-0.5);
+    pieces.forEach(p=>container.appendChild(p));
+}
+
+/* ===== DROP ===== */
+function handleDrop(zone){
+    if(!dragged || zone.firstChild) return;
+
+    zone.appendChild(dragged);
+
+    if(dragged.dataset.index===zone.dataset.index){
+        dragged.classList.add("placed");
+        feedback.textContent=praise[praiseIndex];
+        praiseIndex=(praiseIndex+1)%praise.length;
+    }else{
+        feedback.textContent="Балақай, тағы ойлан!";
+        setTimeout(()=>container.appendChild(dragged),600);
+    }
+
+    checkWin();
+}
+
+/* ===== WIN ===== */
+function checkWin(){
+    const zones=document.querySelectorAll(".drop-zone");
+    let win=true;
+
+    zones.forEach(z=>{
+        if(!z.firstChild ||
+           z.firstChild.dataset.index!==z.dataset.index){
+            win=false;
+        }
+    });
+
+    if(win){
+        finalCongrats.classList.add("show");
+    }
+}
+
+/* ===== RESTART ===== */
+function restartGame(){
+    finalCongrats.classList.remove("show");
+    feedback.textContent="";
+    praiseIndex=0;
+    createBoard();
+    createPieces();
+}
+
+/* ===== INIT ===== */
+createBoard();
+createPieces();
+</script>
+
+</body>
+</html>
